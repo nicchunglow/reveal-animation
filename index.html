@@ -1,0 +1,760 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Matchup Reveal v4 — R3F</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--void:#050405;--char:#140B0C;--red:#E10600;--ember:#FF3B1F;
+        --blood:#5E0806;--bone:#F6F1EF;--ash:#8A7472;--steel:#C9BDBA}
+  *{box-sizing:border-box}
+  html,body,#root{margin:0;height:100%;background:var(--void);color:var(--bone);
+    font-family:"Barlow",system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+  canvas{display:block}
+  .wrap{position:relative;width:100%;height:100vh;overflow:hidden}
+  .scene{position:absolute;inset:0}
+  .grain{position:absolute;inset:0;pointer-events:none;z-index:3;opacity:.22;
+    background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.42) 2px 3px)}
+  .vig{position:absolute;inset:0;pointer-events:none;z-index:2;
+    background:radial-gradient(ellipse at center,transparent 32%,rgba(5,4,5,.9) 100%)}
+
+  .hud{position:absolute;inset:0;pointer-events:none;z-index:5;display:grid;
+    grid-template-rows:auto 1fr auto;padding:clamp(16px,3vw,38px)}
+  .eyebrow{display:flex;justify-content:center;gap:16px;align-items:center;
+    font-family:"Barlow Condensed",sans-serif;font-weight:700;letter-spacing:.46em;
+    text-transform:uppercase;font-size:clamp(10px,1.1vw,13px);color:var(--ash);
+    opacity:0;transition:opacity .5s ease}
+  .eyebrow.on{opacity:1}
+  .eyebrow i{width:32px;height:1px;background:var(--red);font-style:normal}
+
+  .solo{position:absolute;left:50%;bottom:11%;z-index:6;pointer-events:none;
+    transform:translateX(-50%) skewX(-11deg);text-align:center;opacity:0;white-space:nowrap}
+  .solo.in{animation:soloIn .4s cubic-bezier(.2,.9,.1,1) forwards}
+  .solo.out{animation:soloOut .24s ease-in forwards}
+  @keyframes soloIn{from{opacity:0;transform:translateX(-50%) skewX(-11deg) translateY(36px)}
+                    to{opacity:1;transform:translateX(-50%) skewX(-11deg) translateY(0)}}
+  @keyframes soloOut{to{opacity:0;transform:translateX(-50%) skewX(-11deg) translateY(-24px)}}
+  .stag{display:block;font-family:"Barlow Condensed",sans-serif;font-weight:700;
+    font-size:clamp(10px,1.1vw,13px);letter-spacing:.5em;color:var(--red);
+    text-transform:uppercase;margin-bottom:.9em}
+  .sname{display:block;font-family:"Archivo Black",sans-serif;text-transform:uppercase;
+    font-size:clamp(30px,7vw,96px);line-height:.92;text-shadow:0 0 50px rgba(225,6,0,.65)}
+  .screw{display:block;font-family:"Barlow Condensed",sans-serif;font-weight:600;
+    font-size:clamp(11px,1.4vw,18px);letter-spacing:.44em;margin-top:.7em;
+    color:var(--steel);text-transform:uppercase}
+
+  .plates{align-self:end;display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+  .plate{padding:13px clamp(16px,2.6vw,38px);opacity:0;
+    background:linear-gradient(90deg,var(--blood),rgba(94,8,6,0) 92%);
+    border-left:4px solid var(--red);transform:skewX(-11deg)}
+  .plate.b{background:linear-gradient(270deg,var(--blood),rgba(94,8,6,0) 92%);
+    border-left:0;border-right:4px solid var(--red);text-align:right}
+  .plate>*{display:block;transform:skewX(11deg)}
+  .plate.in{animation:pIn .34s cubic-bezier(.2,.9,.1,1) forwards}
+  @keyframes pIn{from{opacity:0}to{opacity:1}}
+  .pname{font-family:"Archivo Black",sans-serif;line-height:.94;text-transform:uppercase;
+    font-size:clamp(18px,3.6vw,52px)}
+  .pcrew{font-family:"Barlow Condensed",sans-serif;font-weight:600;
+    font-size:clamp(9px,1.1vw,14px);letter-spacing:.34em;margin-top:.55em;
+    color:var(--steel);text-transform:uppercase}
+
+  .panel{position:absolute;right:0;top:0;height:100%;width:min(330px,90vw);z-index:12;
+    background:rgba(5,4,5,.97);border-left:1px solid rgba(225,6,0,.3);padding:22px;
+    overflow:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1)}
+  .panel.open{transform:none}
+  .panel h2{font-family:"Barlow Condensed",sans-serif;letter-spacing:.32em;
+    text-transform:uppercase;font-size:12px;color:var(--red);margin:0 0 16px}
+  label{display:block;font-family:"Barlow Condensed",sans-serif;font-weight:700;
+    letter-spacing:.2em;text-transform:uppercase;font-size:11px;color:var(--ash);margin:15px 0 6px}
+  input[type=text]{width:100%;background:var(--char);border:1px solid rgba(138,116,114,.35);
+    color:var(--bone);padding:9px 11px;font:inherit;font-size:14px;border-radius:2px}
+  input:focus,button:focus-visible,.drop:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+  .drop{border:1px dashed rgba(138,116,114,.45);border-radius:2px;padding:15px;text-align:center;
+    font-size:13px;color:var(--ash);cursor:pointer;background:var(--char)}
+  .drop.filled{border-style:solid;border-color:var(--red);color:var(--bone)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;
+    font-family:"Barlow Condensed",sans-serif;font-weight:700;letter-spacing:.16em;
+    text-transform:uppercase;font-size:11px;color:var(--ash)}
+  .row input[type=range]{flex:1;accent-color:var(--red)}
+  button{width:100%;margin-top:18px;background:var(--red);color:#fff;border:0;padding:13px;
+    font-family:"Archivo Black",sans-serif;font-size:12px;letter-spacing:.12em;
+    text-transform:uppercase;cursor:pointer;border-radius:2px}
+  button.ghost{background:transparent;color:var(--ash);border:1px solid rgba(138,116,114,.35);
+    font-family:"Barlow Condensed",sans-serif;font-weight:700;margin-top:8px}
+  button.ghost.on{color:var(--bone);border-color:var(--red)}
+  .toggle{position:absolute;top:clamp(16px,3vw,38px);right:clamp(16px,3vw,38px);z-index:13;
+    width:auto;margin:0;padding:9px 15px;background:rgba(246,241,239,.1);color:var(--bone);
+    backdrop-filter:blur(8px);font-size:11px}
+  .err{position:absolute;left:0;right:0;bottom:0;z-index:30;display:none;background:#3A0705;
+    border-top:2px solid var(--red);padding:12px 16px;font-family:"Barlow Condensed",sans-serif;
+    font-size:13px;line-height:1.6}
+  .err.on{display:block}
+  .boot{position:absolute;inset:0;z-index:25;display:grid;place-content:center;text-align:center;
+    font-family:"Barlow Condensed",sans-serif;letter-spacing:.4em;text-transform:uppercase;
+    font-size:12px;color:var(--ash)}
+  .boot.gone{display:none}
+</style>
+
+<div id="root"></div>
+<div class="boot" id="boot">Loading modules&hellip;</div>
+<div class="err" id="err"></div>
+
+<script>
+  window.addEventListener('error', function(e){
+    var b=document.getElementById('err');
+    b.textContent='Error: '+(e.message||'unknown')+(e.filename?('  —  '+e.filename+':'+e.lineno):'');
+    b.className='err on';
+    document.getElementById('boot').className='boot gone';
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var b=document.getElementById('err');
+    b.textContent='Module load failed: '+(e.reason&&e.reason.message?e.reason.message:e.reason)+
+      '  —  this file needs an internet connection and must be opened directly in a browser, not inside a sandboxed preview.';
+    b.className='err on';
+    document.getElementById('boot').className='boot gone';
+  });
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "three": "https://esm.sh/three@0.160.1",
+    "postprocessing": "https://esm.sh/postprocessing@6.34.3?external=three",
+    "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.15.19?external=react,react-dom,three",
+    "@react-three/postprocessing": "https://esm.sh/@react-three/postprocessing@2.16.2?external=react,three,postprocessing,@react-three/fiber"
+  }
+}
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useRef, useMemo, useState, useEffect, Suspense } from 'react';
+import { createRoot } from 'react-dom/client';
+import * as THREE from 'three';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { EffectComposer, Bloom, ChromaticAberration, Vignette, Noise, ToneMapping }
+  from '@react-three/postprocessing';
+import { BlendFunction, ToneMappingMode } from 'postprocessing';
+
+document.getElementById('boot').className = 'boot gone';
+
+/* ==================================================================
+   timing helpers — the three-act structure carried over from v3
+================================================================== */
+const T = {
+  aIn:0.10, aLand:0.48, aOut:1.60,
+  bIn:1.70, bLand:2.08, bOut:3.20,
+  conv:3.28, clash:3.80, vs:3.86, rest:4.30
+};
+const SKEW = -0.19;
+const clamp01 = t => (t < 0 ? 0 : t > 1 ? 1 : t);
+const seg = (t,a,b) => clamp01((t-a)/(b-a));
+const ease = t => 1 - Math.pow(1-t,3);
+const snap = t => 1 - Math.pow(1-t,5);
+
+/* ==================================================================
+   photo -> texture, cover-cropped with a red grade and bottom falloff
+================================================================== */
+const CARD_W = 2.9, CARD_H = 3.9;
+function textureFromFile(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error('read failed'));
+    r.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('not an image'));
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = 1024; c.height = Math.round(1024*CARD_H/CARD_W);
+        const x = c.getContext('2d');
+        const s = Math.max(c.width/img.width, c.height/img.height);
+        const w = img.width*s, h = img.height*s;
+        x.drawImage(img,(c.width-w)/2,(c.height-h)/2,w,h);
+        const g = x.createLinearGradient(0,c.height*0.42,0,c.height);
+        g.addColorStop(0,'rgba(5,4,5,0)'); g.addColorStop(1,'rgba(5,4,5,0.82)');
+        x.fillStyle = g; x.fillRect(0,0,c.width,c.height);
+        x.globalCompositeOperation = 'overlay';
+        x.fillStyle = 'rgba(120,10,6,0.24)'; x.fillRect(0,0,c.width,c.height);
+        x.globalCompositeOperation = 'source-over';
+        const t = new THREE.CanvasTexture(c);
+        t.anisotropy = 8;                       // sharp when angled toward camera
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.needsUpdate = true;
+        resolve(t);
+      };
+      img.src = r.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+function placeholderTexture(letter, hex){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 690;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0,0,512,690);
+  g.addColorStop(0,'#2A0B09'); g.addColorStop(1,'#0A0505');
+  x.fillStyle = g; x.fillRect(0,0,512,690);
+  x.strokeStyle = hex; x.lineWidth = 6; x.strokeRect(18,18,476,654);
+  x.fillStyle = hex; x.font = '700 250px Archivo Black, sans-serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(letter, 256, 355);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+/* VS drawn to a canvas so it lives in the 3D scene and picks up bloom */
+function vsTexture(){
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
+  const x = c.getContext('2d');
+  x.clearRect(0,0,1024,512);
+  x.font = '700 420px Archivo Black, sans-serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  const g = x.createLinearGradient(0,60,0,452);
+  g.addColorStop(0,'#ffffff'); g.addColorStop(.42,'#C9BDBA');
+  g.addColorStop(.55,'#6E5F5C'); g.addColorStop(1,'#ffffff');
+  x.fillStyle = g; x.fillText('VS', 512, 268);
+  x.lineWidth = 10; x.strokeStyle = '#E10600'; x.strokeText('VS', 512, 268);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* ==================================================================
+   animated backdrop — raw GLSL, the cheapest source of real flash
+================================================================== */
+const bgVert = `
+  varying vec2 vUv;
+  void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+`;
+const bgFrag = `
+  uniform float uTime;
+  uniform float uHeat;
+  uniform vec3  uTint;
+  uniform float uDir;
+  varying vec2 vUv;
+
+  float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
+  float noise(vec2 p){
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f*f*(3.0-2.0*f);
+    return mix(mix(hash(i), hash(i+vec2(1,0)), u.x),
+               mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+  }
+
+  void main(){
+    vec2 uv = vUv - 0.5;
+    /* shear so the bands run along the same diagonal as the layout */
+    uv.x += uv.y * 0.19;
+
+    /* streaking energy bands */
+    float flow = uv.x * 6.0 - uTime * uDir * 1.35;
+    float bands = sin(flow) * 0.5 + 0.5;
+    bands = pow(bands, 6.0);
+
+    /* turbulence so it never reads as a flat gradient */
+    float n = noise(vec2(uv.x*3.0 + uTime*0.4*uDir, uv.y*2.2 - uTime*0.2));
+    bands *= 0.55 + n * 0.9;
+
+    /* radial falloff keeps the centre clean behind the dancer */
+    float r = length(uv * vec2(1.0, 1.5));
+    float halo = smoothstep(0.85, 0.06, r);
+    float core = smoothstep(0.55, 0.0, r);
+
+    float energy = bands * halo * (0.7 + uHeat * 1.9) + core * (0.10 + uHeat * 0.55);
+    vec3 col = uTint * energy;
+    col += vec3(1.0, 0.72, 0.55) * core * uHeat * 0.7;   // white-hot centre when charged
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+function Backdrop({ tint, dir, visible, heatRef }){
+  const mat = useRef();
+  const uniforms = useMemo(() => ({
+    uTime:{value:0}, uHeat:{value:0},
+    uTint:{value:new THREE.Color(tint)}, uDir:{value:dir}
+  }), [tint, dir]);
+  useFrame((_, dt) => {
+    if (!mat.current) return;
+    uniforms.uTime.value += dt;
+    uniforms.uHeat.value = THREE.MathUtils.lerp(uniforms.uHeat.value, heatRef.current, 0.12);
+  });
+  return (
+    <mesh position={[0,0,-9]} visible={visible}>
+      <planeGeometry args={[60,34]} />
+      <shaderMaterial ref={mat} uniforms={uniforms}
+        vertexShader={bgVert} fragmentShader={bgFrag}
+        transparent={false} depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
+
+/* ==================================================================
+   a fighter card, with its floor reflection
+================================================================== */
+const Card = React.forwardRef(function Card({ texture, tint }, ref){
+  const grp = useRef();
+  const refl = useRef();
+  React.useImperativeHandle(ref, () => ({
+    group: () => grp.current,
+    reflection: () => refl.current
+  }));
+  return (
+    <group>
+      <group ref={grp}>
+        {/* emissive rim: bright enough to cross the bloom threshold */}
+        <mesh position={[0,0,-0.03]}>
+          <planeGeometry args={[CARD_W+0.12, CARD_H+0.12]} />
+          <meshBasicMaterial color={tint} toneMapped={false} />
+        </mesh>
+        <mesh>
+          <planeGeometry args={[CARD_W, CARD_H]} />
+          <meshBasicMaterial map={texture} toneMapped={false} />
+        </mesh>
+      </group>
+      {/* mirrored copy on the floor, faded */}
+      <group ref={refl}>
+        <mesh scale={[1,-1,1]}>
+          <planeGeometry args={[CARD_W, CARD_H]} />
+          <meshBasicMaterial map={texture} transparent opacity={0.16}
+            depthWrite={false} toneMapped={false} />
+        </mesh>
+      </group>
+    </group>
+  );
+});
+
+/* ==================================================================
+   the diagonal seam — a thin emissive blade that ignites on impact
+================================================================== */
+function Seam({ igniteRef, visible }){
+  const core = useRef(), glow = useRef();
+  useFrame(() => {
+    const ig = igniteRef.current;
+    if (core.current) core.current.material.opacity = 0.2 + ig*0.8;
+    if (glow.current){
+      glow.current.material.opacity = 0.08 + ig*0.7;
+      glow.current.scale.x = 1 + ig*3.2;
+    }
+  });
+  return (
+    <group rotation={[0,0,SKEW]} position={[0,0,-1.2]} visible={visible}>
+      <mesh ref={glow}>
+        <planeGeometry args={[2.6,44]} />
+        <meshBasicMaterial color="#FF3B1F" transparent opacity={0}
+          blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh ref={core}>
+        <planeGeometry args={[0.07,44]} />
+        <meshBasicMaterial color="#FFFFFF" transparent opacity={0}
+          blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+/* ==================================================================
+   spark burst on the clash
+================================================================== */
+const SPARKS = 260;
+function Sparks({ fireRef }){
+  const pts = useRef();
+  const { positions, velocities } = useMemo(() => {
+    const positions = new Float32Array(SPARKS*3);
+    const velocities = [];
+    for (let i=0;i<SPARKS;i++){
+      const a = (Math.random()-0.5)*1.5, s = 5+Math.random()*16;
+      velocities.push(new THREE.Vector3(
+        Math.cos(a)*s*(Math.random()<0.5?-1:1), Math.sin(a)*s*0.8, (Math.random()-0.5)*4));
+    }
+    return { positions, velocities };
+  }, []);
+  const age = useRef(99);
+  useFrame((_, dt) => {
+    if (!pts.current) return;
+    if (fireRef.current){
+      fireRef.current = false;
+      age.current = 0;
+      const p = pts.current.geometry.attributes.position.array;
+      for (let i=0;i<SPARKS;i++){ p[i*3]=0; p[i*3+1]=(Math.random()-0.5)*9; p[i*3+2]=0; }
+    }
+    age.current += dt;
+    const a = age.current;
+    const m = pts.current.material;
+    if (a < 1.9){
+      m.opacity = 1 - a/1.9;
+      const p = pts.current.geometry.attributes.position.array;
+      for (let i=0;i<SPARKS;i++){
+        p[i*3]   += velocities[i].x*dt;
+        p[i*3+1] += velocities[i].y*dt - 3.8*a*dt;
+        p[i*3+2] += velocities[i].z*dt;
+      }
+      pts.current.geometry.attributes.position.needsUpdate = true;
+    } else m.opacity = 0;
+  });
+  return (
+    <points ref={pts}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position"
+          array={positions} count={SPARKS} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial color="#FFC38A" size={0.16} transparent opacity={0}
+        blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+    </points>
+  );
+}
+
+/* ==================================================================
+   ambient embers
+================================================================== */
+const EMBERS = 260;
+function Embers(){
+  const pts = useRef();
+  const { positions, speeds } = useMemo(() => {
+    const positions = new Float32Array(EMBERS*3); const speeds = [];
+    for (let i=0;i<EMBERS;i++){
+      positions[i*3]   = (Math.random()-0.5)*34;
+      positions[i*3+1] = (Math.random()-0.5)*22;
+      positions[i*3+2] = -8 + Math.random()*9;
+      speeds.push(0.15 + Math.random()*0.5);
+    }
+    return { positions, speeds };
+  }, []);
+  useFrame((_, dt) => {
+    if (!pts.current) return;
+    const p = pts.current.geometry.attributes.position.array;
+    for (let i=0;i<EMBERS;i++){
+      p[i*3+1] += speeds[i]*dt;
+      if (p[i*3+1] > 11) p[i*3+1] = -11;
+    }
+    pts.current.geometry.attributes.position.needsUpdate = true;
+  });
+  return (
+    <points ref={pts}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position"
+          array={positions} count={EMBERS} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial color="#FF5A2E" size={0.07} transparent opacity={0.7}
+        blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+    </points>
+  );
+}
+
+/* ==================================================================
+   the director — owns the clock and drives everything each frame
+================================================================== */
+function Director({ texA, texB, runId, onBeat }){
+  const { viewport, camera } = useThree();
+  const cardA = useRef(), cardB = useRef();
+  const vsRef = useRef();
+  const t = useRef(0);
+  const heatA = useRef(0), heatB = useRef(0), ignite = useRef(0);
+  const fireSparks = useRef(false);
+  const shake = useRef({ amp:0, age:99 });
+  const fired = useRef({});
+  const [act, setAct] = useState(1);
+
+  const vsTex = useMemo(() => vsTexture(), []);
+
+  /* ---- responsive geometry: spacing derived from the viewport ---- */
+  const L = useMemo(() => {
+    const vw = viewport.width, vh = viewport.height;
+    const vsW = Math.min(vw*0.28, 5.6), vsH = vsW*0.5;
+    let scale = Math.min(1.25, Math.max(0.4, vw/17));
+    let restX;
+    for (let i=0;i<16;i++){
+      const half = (CARD_W*scale)/2;
+      restX = Math.max(vsW/2 + half + vw*0.035, vw*0.235);
+      if (restX + half <= vw/2 - vw*0.02) break;
+      scale *= 0.92;
+    }
+    const soloScale = Math.min(scale*1.45, (vh*0.6)/CARD_H, (vw*0.7)/CARD_W);
+    return { vw, vh, vsW, vsH, scale, restX, soloScale };
+  }, [viewport.width, viewport.height]);
+
+  useEffect(() => { t.current = 0; fired.current = {}; setAct(1); }, [runId]);
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.05);
+    t.current += dt;
+    const now = t.current;
+    const A = cardA.current, B = cardB.current;
+    if (!A || !B) return;
+
+    const gA = A.group(), gB = B.group();
+    const rA = A.reflection(), rB = B.reflection();
+    const beat = (k, at, fn) => { if (!fired.current[k] && now > at){ fired.current[k]=1; fn(); } };
+    const kick = amp => { shake.current = { amp, age:0 }; };
+
+    /* -------- ACT 1 / ACT 2: one dancer, centred, own backdrop -------- */
+    if (now < T.bOut){
+      const first = now < T.aOut;
+      if (first && act !== 1) setAct(1);
+      if (!first && act !== 2) setAct(2);
+
+      const solo = first ? gA : gB, otherG = first ? gB : gA;
+      const soloR = first ? rA : rB, otherR = first ? rB : rA;
+      const p = first ? seg(now,T.aIn,T.aLand) : seg(now,T.bIn,T.bLand);
+      const dir = first ? -1 : 1;
+
+      solo.visible = true; otherG.visible = false;
+      soloR.visible = true; otherR.visible = false;
+
+      const x = dir*L.vw*0.9*(1-snap(p));
+      const s = L.soloScale*(1 + (1-snap(p))*0.12);
+      solo.position.set(x, 0.42, 0);
+      solo.rotation.set(0, dir*0.30*(1-snap(p)) + dir*-0.06, SKEW*0.35);
+      solo.scale.set(s, s, 1);
+
+      soloR.position.set(x, 0.42 - CARD_H*s - 0.18, 0);
+      soloR.rotation.copy(solo.rotation);
+      soloR.scale.set(s, s, 1);
+
+      const heat = Math.sin(clamp01(p)*Math.PI)*0.55 + 0.28;
+      if (first){ heatA.current = heat; heatB.current = 0; }
+      else { heatB.current = heat; heatA.current = 0; }
+
+      beat(first?'a':'b', first?T.aLand:T.bLand, () => kick(0.26));
+      beat(first?'as':'bs', first?T.aLand-0.02:T.bLand-0.02,
+           () => onBeat(first ? 'soloA' : 'soloB'));
+      beat(first?'ao':'bo', first?T.aOut-0.24:T.bOut-0.24,
+           () => onBeat(first ? 'soloAout' : 'soloBout'));
+
+      ignite.current = 0;
+      if (vsRef.current) vsRef.current.scale.setScalar(0.0001);
+    }
+
+    /* -------- ACT 3: converge, clash, split screen -------- */
+    else {
+      if (act !== 3){ setAct(3); }
+      gA.visible = gB.visible = true;
+      rA.visible = rB.visible = true;
+      heatA.current = heatB.current = 0;
+
+      const pc = seg(now, T.conv, T.clash);
+      const meet = L.restX*0.62;
+      let xa = -L.vw*0.85 + (-meet + L.vw*0.85)*snap(pc);
+      let xb =  L.vw*0.85 + ( meet - L.vw*0.85)*snap(pc);
+      const pb = seg(now, T.clash, T.rest);
+      if (now > T.clash){
+        xa = -L.restX - (1-ease(pb))*(L.restX-meet);
+        xb =  L.restX + (1-ease(pb))*(L.restX-meet);
+      }
+
+      const idle = now > T.rest ? now - T.rest : 0;
+      const ya = -0.18 + (idle ? Math.sin(idle*0.7)*0.05 : 0);
+      const yb = -0.18 + (idle ? Math.sin(idle*0.7+Math.PI)*0.05 : 0);
+
+      gA.position.set(xa, ya, 0);
+      gB.position.set(xb, yb, 0);
+      gA.rotation.set(0,  0.42-0.10*snap(pc), SKEW*0.55);
+      gB.rotation.set(0, -0.42+0.10*snap(pc), SKEW*0.55);
+      gA.scale.set(L.scale, L.scale, 1);
+      gB.scale.set(L.scale, L.scale, 1);
+
+      const ry = -0.18 - CARD_H*L.scale - 0.16;
+      rA.position.set(xa, ry, 0); rA.rotation.copy(gA.rotation); rA.scale.set(L.scale,L.scale,1);
+      rB.position.set(xb, ry, 0); rB.rotation.copy(gB.rotation); rB.scale.set(L.scale,L.scale,1);
+
+      beat('clash', T.clash, () => { kick(0.8); fireSparks.current = true; onBeat('clash'); });
+      beat('vs', T.vs, () => onBeat('vs'));
+
+      const ig = now - T.clash;
+      ignite.current = (ig > 0 && ig < 1.5) ? (1 - ig/1.5) : 0;
+
+      /* VS snaps in and then breathes */
+      if (vsRef.current){
+        const pv = seg(now, T.vs, T.vs+0.3);
+        const over = pv < 1 ? (3.4 - 2.4*ease(pv)) : (1 + Math.sin((now-T.vs)*2.2)*0.012);
+        vsRef.current.scale.set(L.vsW*over, L.vsH*over, 1);
+        vsRef.current.material.opacity = pv;
+      }
+    }
+
+    /* -------- camera: shake with exponential decay -------- */
+    shake.current.age += dt;
+    const d = Math.exp(-shake.current.age*10)*shake.current.amp;
+    camera.position.x = (Math.random()-0.5)*d;
+    camera.position.y = 0.15 + (Math.random()-0.5)*d + Math.sin(now*0.4)*0.05;
+    camera.lookAt(0, -0.05, 0);
+  });
+
+  return (
+    <>
+      <Backdrop tint="#E10600" dir={ 1} visible={act===1} heatRef={heatA} />
+      <Backdrop tint="#FF3B1F" dir={-1} visible={act===2} heatRef={heatB} />
+      <Seam igniteRef={ignite} visible={act===3} />
+      <Card ref={cardA} texture={texA} tint="#E10600" />
+      <Card ref={cardB} texture={texB} tint="#FF3B1F" />
+      <mesh ref={vsRef} position={[0,0,0.4]} rotation={[0,0,SKEW]}>
+        <planeGeometry args={[1,1]} />
+        <meshBasicMaterial map={vsTex} transparent opacity={0}
+          depthWrite={false} toneMapped={false} />
+      </mesh>
+      <Sparks fireRef={fireSparks} />
+      <Embers />
+    </>
+  );
+}
+
+/* ==================================================================
+   app shell
+================================================================== */
+function App(){
+  const [names, setNames] = useState({ a:'Dancer A', b:'Dancer B', ca:'Crew', cb:'Crew', round:'Top 16' });
+  const [texA, setTexA] = useState(() => placeholderTexture('A','#E10600'));
+  const [texB, setTexB] = useState(() => placeholderTexture('B','#FF3B1F'));
+  const [runId, setRunId] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [fx, setFx] = useState({ bloom:1.5, aberration:true, grain:true });
+  const [labels, setLabels] = useState({});
+  const fileA = useRef(), fileB = useRef();
+
+  const onBeat = React.useCallback(key => {
+    setLabels(l => {
+      const n = { ...l };
+      if (key === 'soloA'){ n.soloA = 'in'; }
+      if (key === 'soloAout'){ n.soloA = 'out'; }
+      if (key === 'soloB'){ n.soloB = 'in'; }
+      if (key === 'soloBout'){ n.soloB = 'out'; }
+      if (key === 'vs'){ n.plates = true; n.eyebrow = true; }
+      return n;
+    });
+  }, []);
+
+  const play = () => { setLabels({}); setRunId(r => r+1); };
+
+  const pick = async (which, file) => {
+    if (!file) return;
+    try {
+      const t = await textureFromFile(file);
+      which === 'a' ? setTexA(t) : setTexB(t);
+    } catch (e){
+      document.getElementById('err').textContent = 'Photo failed: ' + e.message;
+      document.getElementById('err').className = 'err on';
+    }
+  };
+
+  return (
+    <div className="wrap">
+      <div className="scene">
+        <Canvas
+          dpr={[1, 2]}
+          gl={{ antialias:true, powerPreference:'high-performance' }}
+          camera={{ fov:42, position:[0,0.15,13.2], near:0.1, far:140 }}
+          onCreated={({ gl }) => { gl.setClearColor('#050405'); }}>
+          <Suspense fallback={null}>
+            <Director key={runId} texA={texA} texB={texB} runId={runId} onBeat={onBeat} />
+            <EffectComposer multisampling={0} disableNormalPass>
+              {/* selective-feeling bloom: threshold sits above the photos,
+                  so only emissive rims, the seam, sparks and VS glow */}
+              <Bloom
+                intensity={fx.bloom}
+                luminanceThreshold={0.62}
+                luminanceSmoothing={0.28}
+                mipmapBlur
+                radius={0.82} />
+              <ChromaticAberration
+                offset={fx.aberration ? new THREE.Vector2(0.0011, 0.0007) : new THREE.Vector2(0,0)}
+                blendFunction={BlendFunction.NORMAL} />
+              <Noise opacity={fx.grain ? 0.055 : 0} blendFunction={BlendFunction.OVERLAY} />
+              <Vignette eskil={false} offset={0.22} darkness={0.86} />
+              <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+            </EffectComposer>
+          </Suspense>
+        </Canvas>
+      </div>
+
+      <div className="vig" />
+      {fx.grain && <div className="grain" />}
+
+      <div className={'solo ' + (labels.soloA || '')}>
+        <span className="stag">Side A</span>
+        <span className="sname">{names.a}</span>
+        <span className="screw">{names.ca}</span>
+      </div>
+      <div className={'solo ' + (labels.soloB || '')}>
+        <span className="stag">Side B</span>
+        <span className="sname">{names.b}</span>
+        <span className="screw">{names.cb}</span>
+      </div>
+
+      <div className="hud">
+        <div className={'eyebrow' + (labels.eyebrow ? ' on' : '')}>
+          <i /><span>{names.round}</span><i />
+        </div>
+        <div />
+        <div className="plates">
+          <div className={'plate' + (labels.plates ? ' in' : '')}>
+            <span className="pname">{names.a}</span>
+            <span className="pcrew">{names.ca}</span>
+          </div>
+          <div className={'plate b' + (labels.plates ? ' in' : '')}>
+            <span className="pname">{names.b}</span>
+            <span className="pcrew">{names.cb}</span>
+          </div>
+        </div>
+      </div>
+
+      <button className="toggle" onClick={() => setOpen(o => !o)}>Setup</button>
+
+      <aside className={'panel' + (open ? ' open' : '')}>
+        <h2>Matchup setup</h2>
+        <label>Round label</label>
+        <input type="text" value={names.round}
+          onChange={e => setNames({...names, round:e.target.value})} />
+        <label>Side A — name</label>
+        <input type="text" value={names.a}
+          onChange={e => setNames({...names, a:e.target.value})} />
+        <label>Side A — crew</label>
+        <input type="text" value={names.ca}
+          onChange={e => setNames({...names, ca:e.target.value})} />
+        <label>Side A — photo</label>
+        <div className="drop" onClick={() => fileA.current.click()}>Choose image</div>
+        <input ref={fileA} type="file" accept="image/*" hidden
+          onChange={e => pick('a', e.target.files[0])} />
+
+        <label>Side B — name</label>
+        <input type="text" value={names.b}
+          onChange={e => setNames({...names, b:e.target.value})} />
+        <label>Side B — crew</label>
+        <input type="text" value={names.cb}
+          onChange={e => setNames({...names, cb:e.target.value})} />
+        <label>Side B — photo</label>
+        <div className="drop" onClick={() => fileB.current.click()}>Choose image</div>
+        <input ref={fileB} type="file" accept="image/*" hidden
+          onChange={e => pick('b', e.target.files[0])} />
+
+        <h2 style={{marginTop:'26px'}}>Look</h2>
+        <div className="row">
+          <span>Bloom</span>
+          <input type="range" min="0" max="3" step="0.1" value={fx.bloom}
+            onChange={e => setFx({...fx, bloom:parseFloat(e.target.value)})} />
+        </div>
+        <button className={'ghost' + (fx.aberration ? ' on' : '')}
+          onClick={() => setFx({...fx, aberration:!fx.aberration})}>
+          Chromatic aberration: {fx.aberration ? 'on' : 'off'}
+        </button>
+        <button className={'ghost' + (fx.grain ? ' on' : '')}
+          onClick={() => setFx({...fx, grain:!fx.grain})}>
+          Film grain: {fx.grain ? 'on' : 'off'}
+        </button>
+
+        <button onClick={() => { setOpen(false); play(); }}>Play reveal</button>
+        <button className="ghost"
+          onClick={() => document.documentElement.requestFullscreen?.()}>
+          Fullscreen (projector)
+        </button>
+      </aside>
+    </div>
+  );
+}
+
+createRoot(document.getElementById('root')).render(<App />);
+</script>
